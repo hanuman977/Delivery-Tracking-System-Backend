@@ -1,0 +1,115 @@
+version: '3.9'
+
+services:
+  kafka:
+    image: apache/kafka:latest
+    ports:
+      - "9093:9093"
+    container_name: kafka
+
+    networks:
+      - delivery-net
+    healthcheck:
+      test: ["CMD", "bash", "-c", "nc -z localhost 9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  config-server:
+    image: hanuman97/config-server:latest
+    container_name: config-server
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - SERVER_PORT=8888
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_URI=https://github.com/hanuman977/delivery-tracking-system-configs.git
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_CLONE_ON_START=true
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL=main
+    networks:
+      - delivery-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  eureka-server:
+    image: hanuman97/eureka-server:latest
+    container_name: eureka-server
+    depends_on:
+      config-server:
+        condition: service_healthy
+    environment:
+      - SERVER_PORT=8761
+      - CONFIG_SERVER=http://config-server:8888/
+      - SPRING_PROFILES_ACTIVE=prod
+    networks:
+      - delivery-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  delivery-service:
+    image: hanuman97/delivery-service:latest
+    container_name: delivery-service
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      - SPRING_APPLICATION_NAME=delivery-service
+      - SERVER_PORT=8081
+      - SPRING_PROFILES_ACTIVE=prod
+      - CONFIG_SERVER=http://config-server:8888/
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9093
+      - SPRING_DATASOURCE_URL=jdbc:mysql://deliverydb.clss0gqu0ocy.ap-south-1.rds.amazonaws.com:3306/deliverydb
+      - SPRING_DATASOURCE_USERNAME=admin
+      - SPRING_DATASOURCE_PASSWORD=Mango3003
+      - SPRING_DATASOURCE_DRIVER=com.mysql.cj.jdbc.Driver
+    networks:
+      - delivery-net
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  gateway-server:
+    image: hanuman97/gateway-server:latest
+    container_name: gateway-server
+    ports:
+      - "80:8080"
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      delivery-service:
+        condition: service_healthy
+    environment:
+      - SPRING_APPLICATION_NAME=gateway-server
+      - SERVER_PORT=8080
+      - SPRING_PROFILES_ACTIVE=prod
+      - CONFIG_SERVER=http://config-server:8888/
+      - COGNITO_POOL_ID=ap-south-1_qjk0mAxyO
+      - COGNITO_REGION=ap-south-1
+      - COGNITO_JWKS_URI=https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_qjk0mAxyO/.well-known/jwks.json
+      - COGNITO_ISSUER=https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_qjk0mAxyO
+    networks:
+      - delivery-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+networks:
+  delivery-net:
+    driver: bridge

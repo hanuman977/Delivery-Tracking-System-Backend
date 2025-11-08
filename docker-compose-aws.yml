@@ -1,0 +1,140 @@
+services:
+  # -------------------------------------------------
+  # Spring Cloud Config Server (internal only)
+  # -------------------------------------------------
+  config-server:
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/config-server:latest
+    container_name: config-server
+    environment:
+      - SERVER_PORT=8888
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_URI=${SPRING_CLOUD_CONFIG_SERVER_GIT_URI}
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_CLONE_ON_START=true
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL=main
+    networks:
+      - delivery-net
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8888/actuator/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # -------------------------------------------------
+  # Eureka Server (internal service registry)
+  # -------------------------------------------------
+  eureka-server:
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/eureka-server:latest
+    container_name: eureka-server
+    depends_on:
+      config-server:
+        condition: service_healthy
+    environment:
+      - SERVER_PORT=8761
+      - CONFIG_SERVER=http://config-server:8888/
+      - SPRING_PROFILES_ACTIVE=prod
+    networks:
+      - delivery-net
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8761/actuator/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # -------------------------------------------------
+  # Delivery Service (internal)
+  # -------------------------------------------------
+  delivery-service:
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/delivery-service:latest
+    container_name: delivery-service
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    environment:
+      - SPRING_APPLICATION_NAME=delivery-service
+      - SERVER_PORT=8081
+      - SPRING_PROFILES_ACTIVE=prod
+      - CONFIG_SERVER=http://config-server:8888/
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
+      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
+      - SPRING_DATASOURCE_DRIVER=${SPRING_DATASOURCE_DRIVER}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_SQS_QUEUE1_URL=${AWS_SQS_QUEUE1_URL}
+      - AWS_SQS_QUEUE2_URL=${AWS_SQS_QUEUE2_URL}
+
+    networks:
+      - delivery-net
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # -------------------------------------------------
+  # Notification Service (internal)
+  # -------------------------------------------------
+  notification-service:
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/notification-service:latest
+    container_name: notification-service
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    environment:
+      - SPRING_APPLICATION_NAME=notification-service
+      - SERVER_PORT=8082
+      - SPRING_PROFILES_ACTIVE=prod
+      - CONFIG_SERVER=http://config-server:8888/
+      - AWS_SES_SENDER_EMAIL=${AWS_SES_SENDER_EMAIL}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_SQS_QUEUE1_URL=${AWS_SQS_QUEUE1_URL}
+      - AWS_SQS_QUEUE2_URL=${AWS_SQS_QUEUE2_URL}
+
+    networks:
+      - delivery-net
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # -------------------------------------------------
+  # API Gateway (publicly accessible)
+  # -------------------------------------------------
+  gateway-server:
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/gateway-server:latest
+    container_name: gateway-server
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      delivery-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+    ports:
+      - "80:8080"
+    environment:
+      - SPRING_APPLICATION_NAME=gateway-server
+      - SERVER_PORT=8080
+      - SPRING_PROFILES_ACTIVE=prod
+      - CONFIG_SERVER=http://config-server:8888/
+      - COGNITO_POOL_ID=${COGNITO_POOL_ID}
+      - COGNITO_REGION=${COGNITO_REGION}
+      - COGNITO_JWKS_URI=${COGNITO_JWKS_URI}
+      - COGNITO_ISSUER=${COGNITO_ISSUER}
+    networks:
+      - delivery-net
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/actuator/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+networks:
+  delivery-net:
+    driver: bridge
