@@ -2,6 +2,8 @@ package com.bits.notification_service.service;
 
 import com.bits.notification_service.dto.KafkaEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +23,8 @@ public class SQSListenerService {
 
     private final SqsClient sqsClient;
     private final EmailService emailService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);;
 
     @Value("${SQS_QUEUE1_URL}")
     private String queueUrl1;
@@ -31,8 +34,21 @@ public class SQSListenerService {
 
     @PostConstruct
     public void startListening() {
-        new Thread(() -> listenToQueue(queueUrl1)).start();
-        new Thread(() -> listenToQueue(queueUrl2)).start();
+        new Thread(() -> {
+            try {
+                log.debug("Starting to listen to queue: " + queueUrl1);
+                Thread.sleep(5000);
+            } catch (InterruptedException ignored) {}
+            listenToQueue(queueUrl1);
+        }).start();
+
+        new Thread(() -> {
+            try {
+                log.debug("Starting to listen to queue: " + queueUrl2);
+                Thread.sleep(5000);
+            } catch (InterruptedException ignored) {}
+            listenToQueue(queueUrl2);
+        }).start();
     }
 
     private void listenToQueue(String queueUrl) {

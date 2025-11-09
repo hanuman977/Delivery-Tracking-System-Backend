@@ -55,8 +55,9 @@ public class GatewayConfig {
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public CorsWebFilter corsWebFilter() {
         CorsConfiguration corsConfig = new CorsConfiguration();
-        corsConfig.setAllowedOrigins(List.of("*"));
+        corsConfig.setAllowedOrigins(List.of("http://localhost:8080", "https://54.242.245.163, http://54.242.245.163"));
         corsConfig.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        corsConfig.setAllowCredentials(true);
         corsConfig.setAllowedHeaders(List.of("*"));
         corsConfig.setMaxAge(3600L);
 

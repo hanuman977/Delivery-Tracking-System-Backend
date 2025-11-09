@@ -7,6 +7,9 @@ import com.bits.delivery_service.repository.RouteRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Configuration
 public class DataSeeder {
@@ -48,5 +51,19 @@ public class DataSeeder {
                 hubRepository.save(h2);
             }
         };
+    }
+
+    @Bean
+    public SqsClient sqsClient() {
+        String region = System.getenv("AWS_REGION");
+
+        if (region == null || region.isEmpty()) {
+            throw new IllegalStateException("AWS_REGION environment variable is not set");
+        }
+
+        return SqsClient.builder()
+                .region(Region.of(region))
+                .credentialsProvider(DefaultCredentialsProvider.create())
+                .build();
     }
 }

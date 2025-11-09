@@ -3,7 +3,9 @@ services:
   # Spring Cloud Config Server (internal only)
   # -------------------------------------------------
   config-server:
-    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/config-server:latest
+    image: hanuman97/config-server:latest
+    extra_hosts:
+      - "169.254.169.254:169.254.169.254"
     container_name: config-server
     environment:
       - SERVER_PORT=8888
@@ -23,7 +25,9 @@ services:
   # Eureka Server (internal service registry)
   # -------------------------------------------------
   eureka-server:
-    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/eureka-server:latest
+    image: hanuman97/eureka-server:latest
+    extra_hosts:
+      - "169.254.169.254:169.254.169.254"
     container_name: eureka-server
     depends_on:
       config-server:
@@ -44,7 +48,9 @@ services:
   # Delivery Service (internal)
   # -------------------------------------------------
   delivery-service:
-    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/delivery-service:latest
+    image: hanuman97/delivery-service:latest
+    extra_hosts:
+      - "169.254.169.254:169.254.169.254"
     container_name: delivery-service
     depends_on:
       eureka-server:
@@ -61,8 +67,8 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
       - SPRING_DATASOURCE_DRIVER=${SPRING_DATASOURCE_DRIVER}
       - AWS_REGION=${AWS_REGION}
-      - AWS_SQS_QUEUE1_URL=${AWS_SQS_QUEUE1_URL}
-      - AWS_SQS_QUEUE2_URL=${AWS_SQS_QUEUE2_URL}
+      - SQS_QUEUE1_URL=${SQS_QUEUE1_URL}
+      - SQS_QUEUE2_URL=${SQS_QUEUE2_URL}
 
     networks:
       - delivery-net
@@ -76,27 +82,31 @@ services:
   # Notification Service (internal)
   # -------------------------------------------------
   notification-service:
-    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/notification-service:latest
+    image: hanuman97/notification-service:latest
+    extra_hosts:
+      - "169.254.169.254:169.254.169.254"
     container_name: notification-service
     depends_on:
       eureka-server:
         condition: service_healthy
       config-server:
         condition: service_healthy
+      delivery-service:
+        condition: service_healthy
     environment:
       - SPRING_APPLICATION_NAME=notification-service
       - SERVER_PORT=8082
       - SPRING_PROFILES_ACTIVE=prod
       - CONFIG_SERVER=http://config-server:8888/
-      - AWS_SES_SENDER_EMAIL=${AWS_SES_SENDER_EMAIL}
+      - AWS_SES_SENDER=${AWS_SES_SENDER}
       - AWS_REGION=${AWS_REGION}
-      - AWS_SQS_QUEUE1_URL=${AWS_SQS_QUEUE1_URL}
-      - AWS_SQS_QUEUE2_URL=${AWS_SQS_QUEUE2_URL}
+      - SQS_QUEUE1_URL=${SQS_QUEUE1_URL}
+      - SQS_QUEUE2_URL=${SQS_QUEUE2_URL}
 
     networks:
       - delivery-net
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:8082/actuator/health" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -105,7 +115,9 @@ services:
   # API Gateway (publicly accessible)
   # -------------------------------------------------
   gateway-server:
-    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/gateway-server:latest
+    image: hanuman97/gateway-server:latest
+    extra_hosts:
+      - "169.254.169.254:169.254.169.254"
     container_name: gateway-server
     depends_on:
       eureka-server:
@@ -117,7 +129,7 @@ services:
       notification-service:
         condition: service_healthy
     ports:
-      - "80:8080"
+      - "8080:8080"
     environment:
       - SPRING_APPLICATION_NAME=gateway-server
       - SERVER_PORT=8080

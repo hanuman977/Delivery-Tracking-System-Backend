@@ -1,26 +1,10 @@
-version: '3.9'
-
 services:
-  kafka:
-    image: apache/kafka:latest
-    ports:
-      - "9093:9093"
-    container_name: kafka
-
-    networks:
-      - delivery-net
-    healthcheck:
-      test: ["CMD", "bash", "-c", "nc -z localhost 9092"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
+  # -------------------------------------------------
+  # Spring Cloud Config Server (internal only)
+  # -------------------------------------------------
   config-server:
-    image: hanuman97/config-server:latest
+    image: /hanuman97config-server:latest
     container_name: config-server
-    depends_on:
-      kafka:
-        condition: service_healthy
     environment:
       - SERVER_PORT=8888
       - SPRING_PROFILES_ACTIVE=prod
@@ -30,13 +14,16 @@ services:
     networks:
       - delivery-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8888/actuator/health" ]
       interval: 10s
       timeout: 5s
       retries: 10
 
+  # -------------------------------------------------
+  # Eureka Server (internal service registry)
+  # -------------------------------------------------
   eureka-server:
-    image: hanuman97/eureka-server:latest
+    image: /hanuman97eureka-server:latest
     container_name: eureka-server
     depends_on:
       config-server:
@@ -48,31 +35,35 @@ services:
     networks:
       - delivery-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8761/actuator/health" ]
       interval: 10s
       timeout: 5s
       retries: 10
 
+  # -------------------------------------------------
+  # Delivery Service (internal)
+  # -------------------------------------------------
   delivery-service:
-    image: hanuman97/delivery-service:latest
+    image: /hanuman97delivery-service:latest
     container_name: delivery-service
     depends_on:
       eureka-server:
         condition: service_healthy
       config-server:
         condition: service_healthy
-      kafka:
-        condition: service_healthy
     environment:
       - SPRING_APPLICATION_NAME=delivery-service
       - SERVER_PORT=8081
       - SPRING_PROFILES_ACTIVE=prod
       - CONFIG_SERVER=http://config-server:8888/
-      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9093
-      - SPRING_DATASOURCE_URL=jdbc:mysql://deliverydb.clss0gqu0ocy.ap-south-1.rds.amazonaws.com:3306/deliverydb
+      - SPRING_DATASOURCE_URL=jdbc:mysql://delivery-tracking.c8dy0q8cg8fj.us-east-1.rds.amazonaws.com:3306/Delivery
       - SPRING_DATASOURCE_USERNAME=admin
       - SPRING_DATASOURCE_PASSWORD=Mango3003
       - SPRING_DATASOURCE_DRIVER=com.mysql.cj.jdbc.Driver
+      - AWS_REGION=us-east-1
+      - AWS_SQS_QUEUE1_URL=https://sqs.us-east-1.amazonaws.com/331005568745/PACKET_CREATED
+      - AWS_SQS_QUEUE2_URL=https://sqs.us-east-1.amazonaws.com/331005568745/STATUS_UPDATED
+
     networks:
       - delivery-net
     healthcheck:
@@ -81,11 +72,41 @@ services:
       timeout: 5s
       retries: 10
 
+  # -------------------------------------------------
+  # Notification Service (internal)
+  # -------------------------------------------------
+  notification-service:
+    image: /hanuman97notification-service:latest
+    container_name: notification-service
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    environment:
+      - SPRING_APPLICATION_NAME=notification-service
+      - SERVER_PORT=8082
+      - SPRING_PROFILES_ACTIVE=prod
+      - CONFIG_SERVER=http://config-server:8888/
+      - AWS_SES_SENDER_EMAIL=hanumansk777@gmail.com
+      - AWS_REGION=${AWS_REGION}
+      - AWS_SQS_QUEUE1_URL=${AWS_SQS_QUEUE1_URL}
+      - AWS_SQS_QUEUE2_URL=${AWS_SQS_QUEUE2_URL}
+
+    networks:
+      - delivery-net
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # -------------------------------------------------
+  # API Gateway (publicly accessible)
+  # -------------------------------------------------
   gateway-server:
-    image: hanuman97/gateway-server:latest
+    image: /hanuman97gateway-server:latest
     container_name: gateway-server
-    ports:
-      - "80:8080"
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -93,19 +114,22 @@ services:
         condition: service_healthy
       delivery-service:
         condition: service_healthy
+      notification-service:
+        condition: service_healthy
+    ports:
+      - "80:8080"
     environment:
       - SPRING_APPLICATION_NAME=gateway-server
       - SERVER_PORT=8080
       - SPRING_PROFILES_ACTIVE=prod
       - CONFIG_SERVER=http://config-server:8888/
-      - COGNITO_POOL_ID=ap-south-1_qjk0mAxyO
-      - COGNITO_REGION=ap-south-1
-      - COGNITO_JWKS_URI=https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_qjk0mAxyO/.well-known/jwks.json
-      - COGNITO_ISSUER=https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_qjk0mAxyO
+      - COGNITO_POOL_IDus-east-1
+      - COGNITO_JWKS_URI=https://cognito-idp.us-east-1.amazonaws.com/us-east-1_CC6FVpFv9/.well-known/jwks.json
+      - COGNITO_ISSUER=https://cognito-idp.us-east-1.amazonaws.com/us-east-1_CC6FVpFv9
     networks:
       - delivery-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/actuator/health" ]
       interval: 10s
       timeout: 5s
       retries: 10

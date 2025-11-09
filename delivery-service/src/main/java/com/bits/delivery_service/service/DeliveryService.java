@@ -8,11 +8,11 @@ import com.bits.delivery_service.mapper.PacketMapper;
 import com.bits.delivery_service.mapper.RouteMapper;
 import com.bits.delivery_service.repository.*;
 import com.bits.delivery_service.utility.DeliveryStatus;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONArray;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -28,7 +28,7 @@ public class DeliveryService {
     private final RouteRepository routeRepository;
     private final ConsignmentEventRepository consignmentEventRepository;
     private final PacketEventRepository packetEventRepository;
-    private final KafkaTemplate<String, KafkaEvent> kafka;
+    private final SQSService sqsService;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public List<String> getHubs() {
@@ -62,7 +62,11 @@ public class DeliveryService {
         packetRepository.save(item);
 
         KafkaEvent event = KafkaEventMapper.toKafkaEvent(item);
-        kafka.send("PACKET_CREATED", event);
+        try {
+            sqsService.sendToQueues(event, "PACKET_CREATED");
+        } catch (JsonProcessingException e) {
+            log.error("Cannot Push Data. Details: " + e.getMessage());
+        }
         packetEventRepository.save(new PacketEvent(item.getId(), item.getTrackingId(), item.getCurrentHub(), item.getStatus().name(), LocalDateTime.now()));
         return PacketMapper.toDTO(item);
     }
@@ -274,7 +278,11 @@ public class DeliveryService {
             }
             packetRepository.save(value);
             KafkaEvent event = KafkaEventMapper.toKafkaEvent(value);
-            kafka.send("STATUS_UPDATED", event);
+            try {
+                sqsService.sendToQueues(event, "PACKET_CREATED");
+            } catch (JsonProcessingException e) {
+                log.error("Cannot Push Data. Dtails: " + e.getMessage());
+            }
 
             PacketEvent packetEvent = new PacketEvent();
             packetEvent.setPacketId(value.getId());
