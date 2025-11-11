@@ -1,5 +1,4 @@
 # Multi-stage Dockerfile for config-server
-# Build stage - JDK 21 with Maven 3.6.3 installed
 FROM eclipse-temurin:21-jdk AS build
 ARG MAVEN_VERSION=3.6.3
 RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates tar \
@@ -13,9 +12,7 @@ COPY .mvn .mvn
 COPY src ./src
 RUN mvn -B -DskipTests package
 
-# Runtime stage
 FROM eclipse-temurin:21-jre
-ARG JAR_FILE=target/*.jar
-COPY --from=build ${JAR_FILE} /app/app.jar
+COPY --from=build /workspace/target/*.jar /app/app.jar
 EXPOSE 8888
 ENTRYPOINT ["java","-jar","/app/app.jar"]

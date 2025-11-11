@@ -13,7 +13,6 @@ COPY src ./src
 RUN mvn -B -DskipTests package
 
 FROM eclipse-temurin:21-jre
-ARG JAR_FILE=target/*.jar
-COPY --from=build ${JAR_FILE} /app/app.jar
+COPY --from=build /workspace/target/*.jar /app/app.jar
 EXPOSE 8090
 ENTRYPOINT ["java","-jar","/app/app.jar"]
