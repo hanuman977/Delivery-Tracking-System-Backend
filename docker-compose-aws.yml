@@ -3,7 +3,7 @@ services:
   # Spring Cloud Config Server (internal only)
   # -------------------------------------------------
   config-server:
-    image: 331005568745.dkr.ecr.us-east-1.amazonaws.com/delivery-tracking:config-server-${TAG}
+    image: 331005568745.dkr.ecr.us-east-1.amazonaws.com/delivery-tracking:config-server-TAG
     extra_hosts:
       - "169.254.169.254:169.254.169.254"
     container_name: config-server
@@ -25,7 +25,7 @@ services:
   # Eureka Server (internal service registry)
   # -------------------------------------------------
   eureka-server:
-    image: 331005568745.dkr.ecr.us-east-1.amazonaws.com/delivery-tracking:eureka-server-${TAG}
+    image: 331005568745.dkr.ecr.us-east-1.amazonaws.com/delivery-tracking:eureka-server-TAG
     extra_hosts:
       - "169.254.169.254:169.254.169.254"
     container_name: eureka-server
@@ -48,7 +48,7 @@ services:
   # Delivery Service (internal)
   # -------------------------------------------------
   delivery-service:
-    image: 331005568745.dkr.ecr.us-east-1.amazonaws.com/delivery-tracking:delivery-service-${TAG}
+    image: 331005568745.dkr.ecr.us-east-1.amazonaws.com/delivery-tracking:delivery-service-TAG
     extra_hosts:
       - "169.254.169.254:169.254.169.254"
     container_name: delivery-service
@@ -82,7 +82,7 @@ services:
   # Notification Service (internal)
   # -------------------------------------------------
   notification-service:
-    image: 331005568745.dkr.ecr.us-east-1.amazonaws.com/delivery-tracking:notification-service-${TAG}
+    image: 331005568745.dkr.ecr.us-east-1.amazonaws.com/delivery-tracking:notification-service-TAG
     extra_hosts:
       - "169.254.169.254:169.254.169.254"
     container_name: notification-service
@@ -115,7 +115,7 @@ services:
   # API Gateway (publicly accessible)
   # -------------------------------------------------
   gateway-server:
-    image: 331005568745.dkr.ecr.us-east-1.amazonaws.com/delivery-tracking:gateway-server-${TAG}
+    image: 331005568745.dkr.ecr.us-east-1.amazonaws.com/delivery-tracking:gateway-server-TAG
     extra_hosts:
       - "169.254.169.254:169.254.169.254"
     container_name: gateway-server
